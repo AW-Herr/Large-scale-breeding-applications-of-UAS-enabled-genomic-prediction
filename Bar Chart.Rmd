@@ -1,0 +1,248 @@
+```{r}
+gc()
+library(ggcorrplot)
+library(ggpubr)
+library(ggthemr)
+library(tidyverse)
+library(stringr)
+
+addline_format <- function(x,...){
+  gsub('\\s','\n',x)}
+
+temp <- list.files(path = "Predictions/",pattern = "*.csv")
+temp2 <- str_sub_all(temp, end = -5)
+sub <- substr(temp2, 1, 4)
+temp3 <- str_sub_all(temp2, start = 6)
+temp4 <- list()
+for (i in 1:length(temp3)) {
+  temp4[[i]] <- paste0(temp3[[i]],"_",sub[[i]])
+}
+
+data <- list()
+for (i in 1:length(temp)) {
+  data[[temp4[[i]]]] <- read.csv(paste0("Predictions/",temp[i]))
+}
+data2 <- list()
+for (i in 1:length(data)) {
+  names <- head(names(data[[i]]), n = -2)
+  data2[[i]] <- data.frame(pivot_longer(data[[i]],cols = all_of(names),names_to = 'Traits', values_to = "Value"))
+}
+
+```
+
+```{r}
+pos <- c("Control", "NDVI", "NDRE1","NDRE2","NWI1", "NWI2", "MTVI")
+
+ggthemr("fresh")
+
+for (x in 1:length(data2)) {
+  #x <- 1
+  temp <- data2[[x]]
+  trial <- unique(temp$Trial)
+  
+  for (y in 1:length(trial)) {
+    #y <- 1
+    temp2 <- temp %>% filter(Trial == trial[y])
+    temp2[temp2<0]=0
+    title1 <- as.character(temp2[1,1])
+    
+    fig <- ggplot(data = temp2, aes(x=Traits, y=Value, fill=Model)) +
+      geom_bar(stat = "identity", position=position_dodge()) +
+      scale_x_discrete(limits = pos, labels = function(x,...){
+      gsub('\\s','\n',x)})+
+      theme(legend.title = element_blank()) +
+      labs(title = title1) +
+      xlab(element_blank()) +
+      ylab(element_blank())
+    ggsave(filename = paste0("Predictions/",title1,".jpeg"), plot = fig, device = "jpeg", height = 3, width = 7, units = "in")
+  }
+
+}
+```
+
+```{r}
+data_summary <- function(data, varname, groupnames){
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+ return(data_sum)
+}
+```
+
+
+#Average Preformance
+
+```{r}
+all <- read.csv("All_cors.csv")
+
+names(all) <- gsub(names(all), pattern = "\\.", replacement = "+ ")
+
+name <- tail(names(all), n = -2)
+all <- pivot_longer(all,cols = all_of(name),names_to = 'Traits', values_to = "Value")
+#all[all<0]=0
+
+pos <- name
+
+ggthemr("fresh")
+all19 <- all %>% filter(Year == 2019)
+fig19 <- ggplot(data = all19, aes(x=Traits, y=Value, fill=Model)) +
+            geom_bar(stat = "identity", position=position_dodge()) +
+            scale_x_discrete(limits = pos, labels = function(x,...){
+            gsub('\\s','\n',x)})+
+            theme(legend.title = element_blank(),legend.position = "bottom", ) +
+            labs(title = "2019 Prediction Accuracy") +
+            xlab(element_blank()) +
+            ylab(element_blank()) 
+ggsave(filename = "19_cors.jpeg", plot = fig19, device = "jpeg", height = 7, width = 8, units = "in")
+
+
+all20 <- all %>% filter(Year == 2020)
+fig20 <- ggplot(data = all20, aes(x=Traits, y=Value, fill=Model)) +
+            geom_bar(stat = "identity", position=position_dodge()) +
+            scale_x_discrete(limits = pos, labels = function(x,...){
+            gsub('\\s','\n',x)})+
+            theme(legend.title = element_blank(),legend.position = "bottom", ) +
+            labs(title = "2020 Prediction Accuracy") +
+            xlab(element_blank()) +
+            ylab(element_blank())
+ggsave(filename = "20_cors.jpeg", plot = fig20, device = "jpeg", height = 7, width = 8, units = "in")
+
+c("#111111", "#65ADC2" ,"#233B43", "#E84646", "#C29365", "#362C21" ,"#316675", "#168E7F", "#109B37")
+
+all21 <- all %>% filter(Year == 2021)
+fig21 <- ggplot(data = all21, aes(x=Traits, y=Value, fill=Model)) +
+            geom_bar(stat = "identity", position=position_dodge()) +
+            scale_x_discrete(limits = pos, labels = function(x,...){
+            gsub('\\s','\n',x)})+
+            theme(legend.title = element_blank(),legend.position = "bottom", ) +
+            labs(title = "2021 Prediction Accuracy") +
+            xlab(element_blank()) +
+            ylab(element_blank())
+ggsave(filename = "21_cors.jpeg", plot = fig21, device = "jpeg", height = 7, width = 8, units = "in")
+
+
+all22 <- all %>% filter(Year == 2022)
+fig22 <- ggplot(data = all22, aes(x=Traits, y=Value, fill=Model)) +
+            geom_bar(stat = "identity", position=position_dodge()) +
+            scale_x_discrete(limits = pos, labels = function(x,...){
+            gsub('\\s','\n',x)})+
+            theme(legend.title = element_blank(),legend.position = "bottom" ) +
+            labs(title = "2022 Prediction Accuracy") +
+            xlab(element_blank()) +
+            ylab(element_blank())
+ggsave(filename = "22_cors.jpeg", plot = fig22, device = "jpeg", height = 7, width = 8, units = "in")
+
+allglobal <- all %>% filter(Year != "Global")
+allglobal <- data_summary(all, varname = "Value", groupnames = c("Model","Traits"))
+
+
+figall <- ggplot(data = allglobal, aes(x=Traits, y=Value, fill=Model)) +
+            geom_bar(stat = "identity", position=position_dodge()) +
+            scale_x_discrete(limits = pos, labels = function(x,...){
+            gsub('\\s','\n',x)})+
+            theme(legend.title = element_blank(),legend.position = "bottom", axis.text.x = element_text(size = 7) ) +
+            labs(title = "Average Prediction Accuracy 2019-2022") +
+            xlab(element_blank()) +
+            ylab(element_blank()) +
+            geom_errorbar(aes(ymin=Value-sd, ymax=Value+sd), width=.2,
+                 position=position_dodge(.9), color = "black") 
+
+allfig <- ggarrange(fig19,fig20,fig21,fig22, ncol = 2,nrow = 2)
+ggsave(filename = "Sup_Fig_Year_cors.jpeg", plot = allfig, device = "jpeg", height = 10, width = 13, units = "in")
+ggsave(filename = "All_cors.jpeg", plot = figall, device = "jpeg", height = 5, width = 6, units = "in")
+```
+
+#Trial Average Preformance
+
+```{r}
+library(formattable)
+pos <- c("Control", "NDVI", "NDRE1","NDRE2","NWI1", "NWI2", "MTVI")
+#2019 
+all_trial <- read.csv("All_Trial_Cors.csv")
+names(all_trial) <- gsub(names(all_trial), pattern = "\\.", replacement = "+ ")
+
+name <- tail(names(all_trial), n = -3)
+all_trial <- pivot_longer(all_trial,cols = all_of(name),names_to = 'Traits', values_to = "Value")
+#all_trial[all_trial<0]=0
+
+all_trial <- all_trial %>% filter(Year != "Global")
+all_trial <- data_summary(all_trial, varname = "Value", groupnames = c("Model","Traits","Trial"))
+
+pos <- name
+
+ggthemr("fresh")
+
+allsp <- all_trial %>% filter(Trial == "SP")
+
+figsp <- ggplot(data = allsp, aes(x=Traits, y=Value, fill=Model)) +
+            geom_bar(stat = "identity", position=position_dodge()) +
+            scale_x_discrete(limits = pos, labels = function(x,...){
+            gsub('\\s','\n',x)})+
+            theme(legend.title = element_blank(),legend.position = "bottom", ) +
+            labs(title = "Global SP Prediction Accuracy") +
+            xlab(element_blank()) +
+            ylab(element_blank()) +
+            geom_errorbar(aes(ymin=Value-sd, ymax=Value+sd), width=.2,
+                 position=position_dodge(.9), color = "black")
+ggsave(filename = "SP_cors.jpeg", plot = figsp, device = "jpeg", height = 7, width = 8, units = "in")
+
+
+allprelim <- all_trial %>% filter(Trial == "Prelim")
+
+figprelim <- ggplot(data = allprelim, aes(x=Traits, y=Value, fill=Model)) +
+            geom_bar(stat = "identity", position=position_dodge()) +
+            scale_x_discrete(limits = pos, labels = function(x,...){
+            gsub('\\s','\n',x)})+
+            theme(legend.title = element_blank(),legend.position = "bottom", ) +
+            labs(title = "Global Prelim Prediction Accuracy") +
+            xlab(element_blank()) +
+            ylab(element_blank()) +
+            geom_errorbar(aes(ymin=Value-sd, ymax=Value+sd), width=.2,
+                 position=position_dodge(.9), color = "black")
+ggsave(filename = "Prelim_cors.jpeg", plot = figprelim, device = "jpeg", height = 7, width = 8, units = "in")
+
+
+allAWY1 <- all_trial %>% filter(Trial == "AWY1")
+
+figAWY1 <- ggplot(data = allAWY1, aes(x=Traits, y=Value, fill=Model)) +
+            geom_bar(stat = "identity", position=position_dodge()) +
+            scale_x_discrete(limits = pos, labels = function(x,...){
+            gsub('\\s','\n',x)})+
+            theme(legend.title = element_blank(),legend.position = "bottom", ) +
+            labs(title = "Global AWY1 Prediction Accuracy") +
+            xlab(element_blank()) +
+            ylab(element_blank()) +
+            geom_errorbar(aes(ymin=Value-sd, ymax=Value+sd), width=.2,
+                 position=position_dodge(.9), color = "black")
+ggsave(filename = "AWY1_cors.jpeg", plot = figAWY1, device = "jpeg", height = 7, width = 8, units = "in")
+
+allAWY2 <- all_trial %>% filter(Trial == "AWY2")
+
+figAWY2 <- ggplot(data = allAWY2, aes(x=Traits, y=Value, fill=Model)) +
+            geom_bar(stat = "identity", position=position_dodge()) +
+            scale_x_discrete(limits = pos, labels = function(x,...){
+            gsub('\\s','\n',x)})+
+            theme(legend.title = element_blank(),legend.position = "bottom", ) +
+            labs(title = "Global AWY2 Prediction Accuracy") +
+            xlab(element_blank()) +
+            ylab(element_blank()) +
+            geom_errorbar(aes(ymin=Value-sd, ymax=Value+sd), width=.2,
+                 position=position_dodge(.9), color = "black")
+ggsave(filename = "AWY2_cors.jpeg", plot = figAWY2, device = "jpeg", height = 7, width = 8, units = "in")
+
+allfig2 <- ggarrange(figsp,figprelim,figAWY1,figAWY2, ncol = 2,nrow = 2)
+ggsave(filename = "Sup_Fig_2_Trial_cors.jpeg", plot = allfig2, device = "jpeg", height = 10, width = 13, units = "in")
+
+```
+
+
+
+
+
+
+

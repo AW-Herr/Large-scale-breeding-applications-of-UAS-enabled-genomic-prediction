@@ -1,0 +1,128 @@
+```{r}
+library(tidyverse)
+library(lme4)
+```
+
+```{r}
+Cullis_H2=function(model){
+  library(arm)
+  
+  S_1 <- as.data.frame(VarCorr(model)) 
+  sigma2_g <- S_1[1,4]
+  
+  ses<- se.ranef(model)$'Name1:new.ind' #where 'm' is your model object from 'lmer' (replace 'genotypes' with whatever you call your individuals in the data)
+  v_BLUP<- ses^2
+  sigma2_g=VarCorr(model, comp="Variance")$'Name1:new.ind'[1]
+  Reliability<- 1- v_BLUP/ (2*sigma2_g)  #where sigma2_g is the genetic variance estimated with the model saved in 'm'
+  H2<- round(mean(Reliability),3) #This is equivalent to broad-sense heritability on the line-mean (or family-mean, if your individuals are non-inbred families) basis
+  H2
+}
+```
+
+```{r}
+data <- read.csv("G:/GS/Chapter3/19-22_Soft.csv") %>% dplyr::mutate(NWI2 = as.numeric(NWI2)) %>% dplyr::mutate(NDRE2 = as.numeric(NDRE2))
+
+data$ENV <- paste(data$Location,"_",data$Year)
+data$EXP <- paste(data$Location,"_",data$Year,"_",data$Trial)
+
+data$Check <- as.factor(data$Check)
+data$IBLK <- as.factor(data$IBLK)
+data$EXP <- as.factor(data$EXP)
+
+data <- data %>% mutate(Check.ind = recode(Check, "1"="0", "0"="1"))
+data$new.ind <- data$Check
+
+data$Check.ind <- as.factor(data$Check.ind)
+data$new.ind <- as.factor(data$new.ind)
+
+```
+
+### Cullis Heritability -----
+```{r}
+#BUAC
+Phenotype_BUAC <- lmer(BUAC~Check.ind + (1|Name1:new.ind) + (1|IBLK) 
+                       +(1|EXP) + Check.ind:EXP + 
+                       (1|Name1:new.ind:EXP) + (1|IBLK:EXP), data=data,
+                       control=lmerControl(optimizer="Nelder_Mead",optCtrl=list(maxfun=1e3)))
+
+BUAC_H2 <- Cullis_H2(Phenotype_BUAC)
+
+#MTVI
+Phenotype_MTVI <- lmer(MTVI~Check.ind + (1|Name1:new.ind) + (1|IBLK) 
+                       +(1|EXP) + Check.ind:EXP + 
+                       (1|Name1:new.ind:EXP) + (1|IBLK:EXP), data=data, 
+                       control=lmerControl(optimizer="Nelder_Mead",optCtrl=list(maxfun=1e3)))
+MTVI_H2 <- Cullis_H2(Phenotype_MTVI)
+#NDVI
+Phenotype_NDVI <- lmer(NDVI~Check.ind + (1|Name1:new.ind) + (1|IBLK) 
+                       +(1|EXP) + Check.ind:EXP + 
+                       (1|Name1:new.ind:EXP) + (1|IBLK:EXP), data=data, 
+                       control=lmerControl(optimizer="Nelder_Mead",optCtrl=list(maxfun=1e3)))
+NDVI_H2 <- Cullis_H2(Phenotype_NDVI)
+#NWI1
+Phenotype_NWI1 <- lmer(NWI1~Check.ind + (1|Name1:new.ind) + (1|IBLK) 
+                       +(1|EXP) + Check.ind:EXP + 
+                       (1|Name1:new.ind:EXP) + (1|IBLK:EXP), data=data, 
+                       control=lmerControl(optimizer="Nelder_Mead",optCtrl=list(maxfun=1e3)))
+NWI1_H2 <- Cullis_H2(Phenotype_NWI1)
+#NWI2
+Phenotype_NWI2 <- lmer(NWI2~Check.ind + (1|Name1:new.ind) + (1|IBLK) 
+                       +(1|EXP) + Check.ind:EXP + 
+                       (1|Name1:new.ind:EXP) + (1|IBLK:EXP), data=data, 
+                       control=lmerControl(optimizer="Nelder_Mead",optCtrl=list(maxfun=1e3)))
+NWI2_H2 <- Cullis_H2(Phenotype_NWI2)
+#NDRE1
+Phenotype_NDRE1 <- lmer(NDRE1~Check.ind + (1|Name1:new.ind) + (1|IBLK) 
+                       +(1|EXP) + Check.ind:EXP + 
+                       (1|Name1:new.ind:EXP) + (1|IBLK:EXP), data=data, 
+                       control=lmerControl(optimizer="Nelder_Mead",optCtrl=list(maxfun=1e3)))
+NDRE1_H2 <- Cullis_H2(Phenotype_NDRE1)
+#NDRE2
+Phenotype_NDRE2 <- lmer(NDRE2~Check.ind + (1|Name1:new.ind) + (1|IBLK) 
+                       +(1|EXP) + Check.ind:EXP + 
+                       (1|Name1:new.ind:EXP) + (1|IBLK:EXP), data=data, 
+                       control=lmerControl(optimizer="Nelder_Mead",optCtrl=list(maxfun=1e3)))
+NDRE2_H2 <- Cullis_H2(Phenotype_NDRE2)
+#Canopy Cover
+Phenotype_Can_Cover <- lmer(Can_Cover~Check.ind + (1|Name1:new.ind) + (1|IBLK) 
+                       +(1|EXP) + Check.ind:EXP + 
+                       (1|Name1:new.ind:EXP) + (1|IBLK:EXP), data=data,
+                       control=lmerControl(optimizer="Nelder_Mead",optCtrl=list(maxfun=1e3)))
+Can_Cover_H2 <- Cullis_H2(Phenotype_Can_Cover)
+```
+
+```{r}
+H2 <- data.frame(BUAC_H2,MTVI_H2,NDRE1_H2,NDRE2_H2,NDVI_H2,NWI1_H2,NWI2_H2,Can_Cover_H2)
+write.csv(H2, file = "H2.csv")
+```
+
+```{r}
+library(ggcorrplot)
+library(ggpubr)
+library(ggthemes)
+
+data <- read.csv("allBLUEs.csv")
+
+data3 <- data[,c(3,5:10)] %>% na.omit()
+
+cormatrix <- cor(data3)
+cor<-round(cormatrix, 2)
+
+cortable <- ggcorrplot(cor, 
+               hc.order = FALSE,
+               lab = TRUE,
+               type = "lower",
+               outline.col = "white",
+               ggtheme = theme_pander(),
+               colors = c("#E84646", "white", "#65ADC2")) +
+          labs(title = "2019-2022 SRI Correlation") 
+
+cortable
+
+ggsave(filename = "Corr_Plot.jpg", plot = cortable, device = "jpeg", height = 4, width = 6, units = "in")
+swatch()
+"#111111" "#65ADC2" "#233B43" "#E84646" "#C29365" "#362C21" "#316675" "#168E7F" "#109B37"
+```
+
+
+

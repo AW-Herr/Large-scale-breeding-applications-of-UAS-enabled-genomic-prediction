@@ -1,0 +1,97 @@
+```{r, warning = F, message = F}
+library(tidyverse)
+library(viridis)
+library(GGally)
+library(lme4)
+library(emmeans)
+library(SpATS)
+```
+
+```{r}
+trialDat <- read_csv("19-22_Soft.csv") %>% 
+  mutate(NDRE2 = as.numeric(NDRE2), NWI2 = as.numeric(NWI2)) %>% 
+  mutate(Name1 = as.factor(Name1))%>% 
+  unite(ENV, c("Location","Year","Trial"), sep = "_", remove = F) %>% 
+  select(BLOC,IBLK,Name1,ENV,Experiment.Name,Location,Year,Trial,Check,Plot,Pass,Range,Column,BUAC,Can_Cover,NDVI,NDRE1,NDRE2,NWI1,NWI2,MTVI) %>% 
+  filter(Trial != "SP")
+
+head(trialDat)
+```
+```{r}
+#Rep Trials
+trialBLUEs <- NULL
+for (trait in colnames(trialDat)[14:21]) {
+  
+    traitDat <- trialDat %>% select(c(1:13,trait))
+    
+    traitBLUEs <- NULL
+    for (locName in unique(traitDat$ENV)) {
+      locDat <- filter(traitDat, ENV == locName)
+      
+      spatialLoc <- SAP(Column, Range, nseg = c(4, 4))
+      invisible(capture.output( #Prevents automatic dumping of iterative fitting stats to console
+      spMod <- SpATS(response = trait, genotype = "Name1", genotype.as.random = FALSE,
+                   spatial = ~ spatialLoc,
+                   fixed = ~ BLOC,
+                   data = mutate(locDat, BLOC = as.factor(BLOC)))
+        ))
+      
+     locBLUEs <- predict(spMod, which = "Name1", predFixed = "marginal")
+     traitBLUEs <- rbind(traitBLUEs, data.frame(ENV = locName, select(locBLUEs, Name1, value = predicted.values)))
+     
+    }
+    traitBLUEs$TRAIT <- trait
+    trialBLUEs <- rbind(trialBLUEs, traitBLUEs)
+}
+
+trialBLUEs <- pivot_wider(trialBLUEs, names_from = TRAIT, values_from = value)
+```
+
+```{r}
+SPDat <- read_csv("19-22_Soft.csv") %>% 
+  mutate(NDRE2 = as.numeric(NDRE2), NWI2 = as.numeric(NWI2)) %>% 
+  mutate(Name1 = as.factor(Name1))%>% 
+  unite(ENV, c("Location","Year","Trial"), sep = "_", remove = F) %>% 
+  select(BLOC,IBLK,Name1,ENV,Experiment.Name,Location,Year,Trial,Check,Plot,Pass,Range,Column,BUAC,Can_Cover,NDVI,NDRE1,NDRE2,NWI1,NWI2,MTVI) %>% 
+  filter(Trial == "SP")
+
+head(SPDat)
+```
+
+```{r}
+#SP Trials
+SPBLUEs <- NULL
+for (trait in colnames(SPDat)[14:21]) {
+  
+    traitDat <- SPDat %>% select(c(1:13,trait))
+    
+    traitBLUEs <- NULL
+    for (locName in unique(traitDat$ENV)) {
+      locDat <- filter(traitDat, ENV == locName)
+      
+      spatialLoc <- SAP(Column, Range, nseg = c(4, 4))
+      invisible(capture.output( #Prevents automatic dumping of iterative fitting stats to console
+      spMod <- SpATS(response = trait, genotype = "Name1", genotype.as.random = T,
+                   spatial = ~ spatialLoc,
+                   fixed = ~ IBLK,
+                   data = mutate(locDat, IBLK = as.factor(IBLK)))
+        ))
+      
+     locBLUEs <- predict(spMod, which = "Name1", predFixed = "marginal")
+     traitBLUEs <- rbind(traitBLUEs, data.frame(ENV = locName, select(locBLUEs, Name1, value = predicted.values)))
+     
+    }
+    traitBLUEs$TRAIT <- trait
+    SPBLUEs <- rbind(SPBLUEs, traitBLUEs)
+}
+
+SPBLUEs <- pivot_wider(SPBLUEs, names_from = TRAIT, values_from = value)
+```
+
+```{r}
+allBLUEs <- rbind(SPBLUEs,trialBLUEs)
+
+write.csv(allBLUEs, file = "allBLUEs.csv", row.names = FALSE)
+```
+
+

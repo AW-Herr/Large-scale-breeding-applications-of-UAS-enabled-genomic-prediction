@@ -1,0 +1,335 @@
+```{r}
+rm(list = ls())
+library(dplyr)
+library(stats)
+library(tibble)
+library(data.table)
+library(sommer)
+library(tidyr)
+library(stringr)
+```
+
+```{r}
+#Load Model
+load("2022_cnblup.Rdata")
+load("2022_indices_fixed.Rdata")
+load("2022_multi2_fixed.Rdata")
+load("2022_multi3_fixed.Rdata")
+```
+
+```{r}
+#ID Years
+test_year <- 2022
+
+#All
+# "Pullman" "Farmington" "Harrington" "Davenport" "Ritzville" "Prescott" 
+#SP - Prelim - AWY1 -AWY2
+trial <- "AWY2" 
+
+#Phenomic Data
+Pheno <- fread("allBLUEs.csv")
+
+# Data Formatting ---------------------------------------------------------------------------------------------
+colnames(Pheno) <- c("Location","taxa","BUAC","Canopy.Cover","NDVI","NDRE1","NDRE2","NWI1","NWI2","MTVI")
+Pheno$Location <- str_replace(Pheno$Location, "Walla_Walla", "WallaWalla")
+Pheno1 <- separate(Pheno, col = Location, into = c("ENV", "Year", "Trial"))
+Pheno1$Location <- Pheno$Location
+
+tester<-Pheno1[Pheno1$Year == test_year,]
+#tester<-tester[tester$ENV == trial,] #Location
+tester<-tester[tester$Trial == trial,] #Trial Type
+
+#Remove Test Set in Train
+Pheno1$BUAC[Pheno1$Year == test_year] <- NA
+Pheno1$Canopy.Cover[Pheno1$Year == test_year] <- NA
+Pheno1$NDVI[Pheno1$Year == test_year] <- NA
+Pheno1$NDRE2[Pheno1$Year == test_year] <- NA
+Pheno1$NDRE1[Pheno1$Year == test_year] <- NA
+Pheno1$NWI2[Pheno1$Year == test_year] <- NA
+Pheno1$NWI1[Pheno1$Year == test_year] <- NA
+Pheno1$MTVI[Pheno1$Year == test_year] <- NA
+```
+
+
+#Fixed Effect no Adjustment ------------------------------------------------------------------------------------------------
+#Control
+```{r}
+index.cor <- list()
+
+bluplist <- as.data.frame(cnblup$U$`u:line`$BUAC)
+colnames(bluplist)[1] = "blupbreak"
+bluplist <- tibble::rownames_to_column(bluplist, "taxa")
+blup2 <- dplyr::inner_join(bluplist, tester, by= 'taxa')
+
+l <- length(index.cor) +1 
+index.cor[[l]] <- cor(blup2$blupbreak,blup2$BUAC)
+```
+
+#Single Effect No Adjustment
+```{r}
+itt <- list("NDVI","NDRE1","NDRE2","NWI1","NWI2","MTVI")
+
+for (i in 1:length(index)) {
+  bluplist <- as.data.frame(index[[i]]$U$`u:line`$BUAC)
+  colnames(bluplist)[1] = "blupbreak"
+  bluplist <- tibble::rownames_to_column(bluplist, "taxa")
+  blup2 <- dplyr::inner_join(bluplist, tester, by= 'taxa')
+  i <- i+1
+  
+  #Prediction Acc
+  index.cor[[i]] <- cor(blup2$blupbreak,blup2$BUAC)
+}
+
+names(index.cor) <- c("Control",itt)
+```
+
+#Two Effect No Adjustment
+```{r}
+itt2 <- c("NDVI+NWI2","NDVI+NDRE2","NDVI+MTVI")
+
+for (i in 1:length(multi2)) {
+  bluplist <- as.data.frame(multi2[[i]]$U$`u:line`$BUAC)
+  colnames(bluplist)[1] = "blupbreak"
+  bluplist <- tibble::rownames_to_column(bluplist, "taxa")
+  blup2 <- dplyr::inner_join(bluplist, tester, by= 'taxa')
+  i <- i+7
+  
+  #Prediction Acc
+  index.cor[[i]] <- cor(blup2$blupbreak,blup2$BUAC)
+}
+
+names(index.cor) <- c("Control",itt,itt2)
+```
+
+#Three Effect No Adjustment
+```{r}
+itt3 <- c("NDVI+NWI2+NDRE2","NDVI+NDRE2+MTVI","NDVI+MTVI+NWI2")
+
+for (i in 1:length(multi3)) {
+  bluplist <- as.data.frame(multi3[[i]]$U$`u:line`$BUAC)
+  colnames(bluplist)[1] = "blupbreak"
+  bluplist <- tibble::rownames_to_column(bluplist, "taxa")
+  blup2 <- dplyr::inner_join(bluplist, tester, by= 'taxa')
+  i <- i+10
+  
+  #Prediction Acc
+  index.cor[[i]] <- cor(blup2$blupbreak,blup2$BUAC)
+}
+
+names(index.cor) <- c("Control",itt,itt2,itt3)
+```
+
+
+```{r}
+index.df <- data.frame(index.cor)
+row.names(index.df) <- c("Fixed Effect no Adjustment")
+```
+
+
+#Fixed Effect w/ Adjustment-------------------------------------------------------------------------------------------------
+#Control
+```{r}
+index.cor.1 <- list()
+
+bluplist <- as.data.frame(cnblup$U$`u:line`$BUAC)
+colnames(bluplist)[1] = "blupbreak"
+bluplist <- tibble::rownames_to_column(bluplist, "taxa")
+blup2 <- dplyr::inner_join(bluplist, tester, by= 'taxa')
+
+l <- length(index.cor.1) +1 
+index.cor.1[[l]] <- cor(blup2$blupbreak,blup2$BUAC)
+```
+
+#Single Effect w/ Adjustment
+```{r}
+for (i in 1:6) {
+  y <- i+7  
+  a <- index[[i]]
+  bluplist <- as.data.frame(a$U$`u:line`$BUAC)
+  x <- a$Beta[2,3]
+  
+  colnames(bluplist)[1] = "blupbreak"
+  bluplist <- tibble::rownames_to_column(bluplist, "taxa")
+  blup2 <- dplyr::inner_join(bluplist, tester, by= 'taxa')
+  blup2 <- drop_na(blup2, c(Canopy.Cover,NDVI,NWI2,MTVI,NDRE2))
+  
+  b <- blup2[[y]]*x + blup2$blupbreak
+  i <- i+1
+  
+  index.cor.1[[i]] <- cor(b,blup2$BUAC)
+}
+names(index.cor.1) <- c("Control",itt)
+```
+
+#Two Effects w/ Adjustment
+```{r}
+#NDVI+NWI2
+z <- multi2[[1]]
+bluplist <- as.data.frame(z$U$`u:line`$BUAC)
+
+a <- z$Beta[2,3]
+b <- z$Beta[3,3]
+
+x <-blup2$NDVI*a + blup2$NWI2*b + blup2$blupbreak
+
+index.cor.1[[8]] <- cor(x,blup2$BUAC)
+
+#NDVI+NDRE2
+z <- multi2[[2]]
+bluplist <- as.data.frame(z$U$`u:line`$BUAC)
+
+a <- z$Beta[2,3]
+b <- z$Beta[3,3]
+
+x <-blup2$NDVI*a + blup2$NDRE2*b + blup2$blupbreak
+
+index.cor.1[[9]] <- cor(x,blup2$BUAC)
+
+#NDVI+MTVI
+z <- multi2[[3]]
+bluplist <- as.data.frame(z$U$`u:line`$BUAC)
+
+a <- z$Beta[2,3]
+b <- z$Beta[3,3]
+
+x <-blup2$NDVI*a + blup2$MTVI*b + blup2$blupbreak
+
+index.cor.1[[10]] <- cor(x,blup2$BUAC)
+
+names(index.cor.1) <- c("Control",itt,itt2)
+```
+
+#Three Effects w/ Adjustment
+```{r}
+
+#NDVI+NWI2+NDRE2
+z <- multi3[[1]]
+bluplist <- as.data.frame(z$U$`u:line`$BUAC)
+
+a <- z$Beta[2,3]
+b <- z$Beta[3,3]
+c <- z$Beta[4,3]
+
+x <-blup2$NDVI*a + blup2$NWI2*b + blup2$NDRE2*c + blup2$blupbreak
+
+index.cor.1[[11]] <- cor(x,blup2$BUAC)
+
+#NDVI+NDRE2+MTVI
+z <- multi3[[2]]
+bluplist <- as.data.frame(z$U$`u:line`$BUAC)
+
+a <- z$Beta[2,3]
+b <- z$Beta[3,3]
+c <- z$Beta[4,3]
+
+x <-blup2$NDVI*a + blup2$NDRE2*b + blup2$MTVI*c + blup2$blupbreak
+
+index.cor.1[[12]] <- cor(x,blup2$BUAC)
+
+#NDVI+MTVI+NWI2
+z <- multi3[[3]]
+bluplist <- as.data.frame(z$U$`u:line`$BUAC)
+
+a <- z$Beta[2,3]
+b <- z$Beta[3,3]
+c <- z$Beta[4,3]
+
+x <-blup2$NDVI*a + blup2$MTVI*b + blup2$NWI2*c + blup2$blupbreak
+
+index.cor.1[[13]] <- cor(x,blup2$BUAC)
+
+names(index.cor.1) <- c("Control",itt,itt2,itt3)
+```
+
+```{r}
+index.df.1 <- data.frame(index.cor.1)
+row.names(index.df.1) <- c("Fixed Effect with Adjustment")
+index.df <- rbind(index.df,index.df.1)
+```
+
+
+##Multivariate Models ------------------------------------------------------------------------------------------------------
+```{r}
+load("2022_indices.Rdata")
+load("2022_multi2.Rdata")
+load("2022_multi3.Rdata")
+```
+
+
+#Control
+```{r}
+index.cor.2 <- list()
+
+bluplist <- as.data.frame(cnblup$U$`u:line`$BUAC)
+colnames(bluplist)[1] = "blupbreak"
+bluplist <- tibble::rownames_to_column(bluplist, "taxa")
+blup2 <- dplyr::inner_join(bluplist, tester, by= 'taxa')
+
+l <- length(index.cor.2) +1 
+index.cor.2[[l]] <- cor(blup2$blupbreak,blup2$BUAC)
+```
+
+#Single Index No Adjustment
+```{r}
+itt <- list("NDVI","NDRE1","NDRE2","NWI1","NWI2","MTVI")
+
+for (i in 1:length(index)) {
+  bluplist <- as.data.frame(index[[i]]$U$`u:line`$BUAC)
+  colnames(bluplist)[1] = "blupbreak"
+  bluplist <- tibble::rownames_to_column(bluplist, "taxa")
+  blup2 <- dplyr::inner_join(bluplist, tester, by= 'taxa')
+  i <- i+1
+  
+  #Prediction Acc
+  index.cor.2[[i]] <- cor(blup2$blupbreak,blup2$BUAC)
+}
+
+names(index.cor.2) <- c("Control",itt)
+
+
+```
+
+#Two Effect No Adjustment
+```{r}
+itt2 <- c("NDVI+NWI2","NDVI+NDRE2","NDVI+MTVI")
+
+for (i in 1:length(multi2)) {
+  bluplist <- as.data.frame(multi2[[i]]$U$`u:line`$BUAC)
+  colnames(bluplist)[1] = "blupbreak"
+  bluplist <- tibble::rownames_to_column(bluplist, "taxa")
+  blup2 <- dplyr::inner_join(bluplist, tester, by= 'taxa')
+  i <- i+7
+  
+  #Prediction Acc
+  index.cor.2[[i]] <- cor(blup2$blupbreak,blup2$BUAC)
+}
+
+
+```
+
+#Three Effect No Adjustment
+```{r}
+itt3 <- c("NDVI+NWI2+NDRE2","NDVI+NDRE2+MTVI","NDVI+MTVI+NWI2")
+
+for (i in 1:length(multi3)) {
+  bluplist <- as.data.frame(multi3[[i]]$U$`u:line`$BUAC)
+  colnames(bluplist)[1] = "blupbreak"
+  bluplist <- tibble::rownames_to_column(bluplist, "taxa")
+  blup2 <- dplyr::inner_join(bluplist, tester, by= 'taxa')
+  i <- i+10
+  
+  #Prediction Acc
+  index.cor.2[[i]] <- cor(blup2$blupbreak,blup2$BUAC)
+}
+
+names(index.cor.2) <- c("Control",itt,itt2,itt3)
+
+index.df.2 <- data.frame(index.cor.2)
+row.names(index.df.2) <- c("Multivariate")
+```
+
+
+```{r}
+index.df <- rbind(index.df,index.df.2)
+write.csv(index.df, file = paste0(test_year,"_",trial,"_cors.csv"))
+```
